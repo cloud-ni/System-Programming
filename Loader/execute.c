@@ -1,3 +1,4 @@
+#pragma warning(disable : 4996)
 #include "main.h"
 #include "execute.h"
 #include "loader.h"
@@ -8,6 +9,13 @@ int BpLen = 0;
 typedef enum {A, X, L, B, S, T, F, PC=8, SW} reg;
 long Reg[9];
 
+typedef struct {
+	int r1;
+	int r2;
+	long addr;
+	long val;
+} Operand;
+
 void setBp(CmdTokens* tokens) {
 	if (BpLen == 0) {
 		BpList = (long*)malloc(BPLIST_LEN * sizeof(long));
@@ -16,6 +24,7 @@ void setBp(CmdTokens* tokens) {
 		BpList = (long*)realloc(BpList, sizeof(BpList) + BPLIST_LEN * sizeof(long));
 	}
 	BpList[BpLen] = strtol(tokens->strpar, NULL, 16);
+	printf("                 [ok] create breakpoint %04X\n", BpList[BpLen] & 0XFFFF );
 	BpLen++;
 }
 int isBp(long addr) {
@@ -33,6 +42,7 @@ void clearBp(void) {
 	}
 	free(BpList);
 	BpList = NULL;
+	printf("                 [ok] clear all breakpoints\n");
 	return;
 }
 void printBp(void) {
@@ -43,10 +53,10 @@ void printBp(void) {
 	}
 	return;
 }
-/* get format */
+/* returns format */
 int getFormat(int* mnem, char* mem) {
-	int flag;
-	for (int i = 0; i < 2 && flag;i++) {
+	int flag = 1;
+	for (int i = 0; i < 2 && flag; i++) {
 		if (flag) {
 			flag = 0;
 		}
@@ -69,114 +79,239 @@ int getFormat(int* mnem, char* mem) {
 		case(STL):
 		case(STX):
 		case(STCH):
-			if ((mem[2] & 0X1) == 0)
-				return 3;
-			else
+			if ((mem[1] & 0X10) == 0X10)//check e bit from xbpe
 				return 4;
-		default:
-			flag = 1;
-			(*mnem) = (*mnem) & 0XFC;
+			else
+				return 3;
+		default://by default menm is 8bit, but it may be 6bit(format3/4)
+			(*mnem) = (*mnem) & 0XFC;//change to 6bit
+			flag = 1; //go through switch once again with new mnemonic
 		}
 
 	}
-	return -1;
+	return -1;//error
 }
 /* calculate target address */
-long getTA(int mnem, char* mem) {
-	int ni, xbpe, addr, TA;
-	ni = mem[1] % 4;//get ni
-	xbpe = mem[2];//get xbpe
+void getTA(int mnem, char* mem, Operand* op) {
+	int ni, xbpe, addr;
+
+	ni = mem[0] % 4;//get ni
+	xbpe = mem[1] >> 4;//get xbpe
+
 	//get specified address
-	if ((xbpe & 1) == 0) {//format 3
-		addr = mem[3] * 0X100 + mem[4] * 0X10 + mem[5];
+	if ((xbpe & 1) == 1) {//format 4
+		addr = (mem[1] % 0X10) * 0X10000 + mem[2] * 0X100 + mem[3];
 	}
-	else {//format 4
-		addr = mem[3] * 0X1000 + mem[4] * 0X100 + mem[5] * 0X10 + mem[6];
+	else {//format 3
+		addr = (mem[1] % 0X10) * 0X100 + mem[2];
 	}
-	if (xbpe & 8 == 8) {//indexing
-
+	//pc relative 
+	if ((xbpe & 2) == 2){
+		addr += Reg[PC];
 	}
-	if (xbpe & 4 == 4) {//base relative
-
+	//base relative
+	if ((xbpe & 4) == 4) {
+		addr += Reg[B];
 	}
-	if (xbpe & 2 == 2) {//pc relative 
-
+	//indexing
+	if ((xbpe & 8) == 8) {
+		addr += Reg[X];
 	}
-	switch (ni) {//addressing mode
+	
+	//addressing mode
+	switch (ni) {
 	case(1)://immediate addressing
-
+		op->val = addr;
 		break;
 	case(2)://indirect addressing
+		op->addr = Mem[addr];
 		break;
 	case(3)://simple addressing
+		op->addr = addr;
 		break;
 	default:
-
+		break;
 	}
-	return TA;
+	return;
+}
+void storeMem(long val, long addr, int len) {
+	for (int i = len-1; i >= 0; i--) {
+		Mem[addr + i] = (char)(val % 0X100);
+		val = val / 0X100;
+	}
+	return;
 }
 /* run instruction */
-void exeInstruct(int mnem, int r1, int r2, long TA) {
+void exeInstruct(int mnem, Operand* op) {
+	int r1, r2, i;
+	long addr, val, m3, m6;
+	//subsitution
+	r1 = op->r1;
+	r2 = op->r2;
+	addr = op->addr;
+	val = op->val;
+
+	if (addr) {
+		m6 = 0;
+		//calculate floating point value
+		for (i = 0;; i++) {
+			m6 += Mem[addr + i];
+			if (i == 5)
+				break;
+			m6 = m6 << 8;
+		}
+		//calculate target value
+		m3 = m6 >> 24;
+	}
+	else if (val) {
+		m3 = m6 = val;
+	}
+
 	switch (mnem) {
 	case(CLEAR):
+		Reg[r1] = 0;
 		break;
 	case(COMP):
+		if (Reg[A] > m3) {
+			Reg[SW] = '>';
+		}
+		else if (Reg[A] == m3) {
+			Reg[SW] = '=';
+		}
+		else {
+			Reg[SW] = '<';
+		}
 		break;
 	case(J):
+		Reg[PC] = addr;
 		break;
 	case(JEQ):
+		if (Reg[SW] == '=') {
+			Reg[PC] = addr;
+		}
 		break;
 	case(JLT):
+		if (Reg[SW] == '<') {
+			Reg[PC] = addr;
+		}
 		break;
 	case(JSUB):
+		Reg[L] = Reg[PC];
+		Reg[PC] = addr;
 		break;
 	case(LDA):
+		Reg[A] = m3;
 		break;
 	case(LDB):
+		Reg[B] = m3;
 		break;
 	case(LDT):
+		Reg[T] = m3;
 		break;
 	case(LDCH):
+		Reg[A] = Mem[addr];
+		break;
+	case(RD):
 		break;
 	case(RSUB):
+		Reg[PC] = Reg[L];
 		break;
 	case(STA):
+		storeMem(Reg[A], addr, 3);
 		break;
 	case(STL):
+		storeMem(Reg[L], addr, 3);
 		break;
 	case(STX):
+		storeMem(Reg[X], addr, 3);
 		break;
 	case(STCH):
+		Mem[addr] = (char)Reg[A];
 		break;
 	case(TD):
+		Reg[SW] = '<';
 		break;
 	case(TIXR):
+		Reg[X]++;
+		if (Reg[X] > Reg[r1]) {
+			Reg[SW] = '>';
+		}
+		else if (Reg[X] == Reg[r1]) {
+			Reg[SW] = '=';
+		}
+		else {
+			Reg[SW] = '<';
+		}
 		break;
 	case(WD):
 		break;
 	default:
+		break;
 	}
+
 	return;
 }
 /* print registers */
 void printReg(void) {
-	printf("A  :  %06X   X  :  %06X\n", Reg[A] & 0XFFFFFF, Reg[X] & 0XFFFFFF);
-	printf("L  :  %06X  PC  :  %06X\n", Reg[L] & 0XFFFFFF, Reg[PC] & 0XFFFFFF);
-	printf("B  :  %06X   S  :  %06X\n", Reg[B] & 0XFFFFFF, Reg[S] & 0XFFFFFF);
+
+	printf("A  :  %06X   X  :  %06X\n", (unsigned int)(Reg[A] & 0XFFFFFF), (unsigned int)(Reg[X] & 0XFFFFFF));
+	printf("L  :  %06X  PC  :  %06X\n", (unsigned int)(Reg[L] & 0XFFFFFF), (unsigned int)(Reg[PC] & 0XFFFFFF));
+	printf("B  :  %06X   S  :  %06X\n", (unsigned int)(Reg[B] & 0XFFFFFF), (unsigned int)(Reg[S] & 0XFFFFFF));
+	printf("T  :  %06X   \n", (unsigned int)(Reg[T] & 0XFFFFFF));
+	if (Reg[PC] == ProgLen) {
+		printf("               End Program\n");
+	}
+	else {
+		printf("               Stop at checkpoint[%X]\n", Reg[PC]);
+	}
+	
+	return;
+}
+/* initialize Operand */
+void initOperand(Operand* operand) {
+	operand->r1 = 0;
+	operand->r2 = 0;
+	operand->addr = 0;
+	operand->val = 0;
 	return;
 }
 /* run the program */
 int runProgram(void) {
 	int flag = 1, mnem, format;
-	int r1, r2;
-	long TA;
+	long cur;
+	Operand operand;
 	memset(Reg, 0, 9 * sizeof(long));//reset registers
 	//initialize registers
 	Reg[PC] = ExeAddr;
 	Reg[L] = ProgLen;
 	
 	while (1) {
-		if (Reg[PC] >= ProgAddr + ProgLen) {//reached last code in the program
+
+		cur = Reg[PC];//save processing address
+
+		initOperand(&operand);//initialize operand
+		mnem = Mem[cur];//get mnemonic
+		format = getFormat(&mnem, Mem + cur);//get format
+		Reg[PC] += format;//update program counter
+
+		switch (format) {
+		case(2):
+			//get r1 and r2 from object code
+			operand.r1 = Mem[cur + 1];
+			operand.r2 = operand.r1 % 0X10;
+			operand.r1 = operand.r1 / 0X10;
+			break;
+		case(3):
+		case(4):
+			getTA(mnem, Mem + cur, &operand);//get target address
+			break;
+		default:
+			break;
+		}
+		
+		exeInstruct(mnem, &operand);//run instruction
+		
+		if (Reg[PC] == ProgLen) {//reached last code in the program
 			ExeAddr = ProgAddr;//reset execution address
 			break;
 		}
@@ -184,28 +319,42 @@ int runProgram(void) {
 			ExeAddr = Reg[PC];//save breakpoint as next execution address
 			break;
 		}
-		r1 = 0; r2 = 0; TA = 0;//initialize
-		mnem = Mem[Reg[PC]] * 0X10 + Mem[Reg[PC] + 1];//get mnemonic
-		format = getFormat(&mnem, Mem + Reg[PC]);//get format
-		switch (format) {
-		case(2):
-			//get r1 and r2 from object code
-			r1 = Mem[Reg[PC] + 1];
-			r2 = r1 % 4;
-			r1 = r1 / 4;
-			break;
-		case(3):
-		case(4):
-			TA = getTA(mnem, Mem + Reg[PC]);//get target address
-			break;
-		default:
-			break;
-		}
-		Reg[PC] += format;//update program counter
-		
-		exeInstruct(mnem, r1, r2, TA);//run instruction
-		
+
 	}
-	printReg();
+	printReg();//print registers
+
+	
 	return 0;
+}
+
+
+void main(void) {
+	CmdTokens* tokens = (CmdTokens*)malloc(sizeof(CmdTokens));
+	CmdTokens* tokens1 = (CmdTokens*)malloc(sizeof(CmdTokens));
+	CmdTokens* tokens2 = (CmdTokens*)malloc(sizeof(CmdTokens));
+	ProgAddr = 0;
+	ExeAddr = 0;
+	strcpy(tokens->strpar, "copy.obj"); 
+	tokens->param_num = 1;
+	loadObj(tokens);
+	tokens->par1 = 0X4000;
+	setProaddr(tokens1);
+
+	strcpy(tokens2->strpar, "3");
+	setBp(tokens2);
+	strcpy(tokens2->strpar, "2A");
+	setBp(tokens2);
+	strcpy(tokens2->strpar, "1046");
+	setBp(tokens2);
+
+	printBp();
+
+	runProgram();
+	runProgram();
+	runProgram();
+	runProgram();
+	
+	free(BpList);
+	free(tokens); free(tokens1); free(tokens2);
+	return;
 }

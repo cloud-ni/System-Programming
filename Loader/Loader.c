@@ -1,15 +1,8 @@
+#pragma warning(disable : 4996)
 #include "main.h"
 #include "loader.h"
 
 
-typedef struct ExSymSlot {//node in external symbol table 
-	char symb[10];//symbol name or name of control section
-	long addr;//address
-	long len;//length of control section
-	int csFlag; //flag for control section
-	struct ExSymSlot *next;
-} ExSymSlot;
-ExSymSlot* ExSymTab[EXSYMTAB_LEN]; //external symbol table
 
 /* create new external symbol slot */
 ExSymSlot* newExSymSlot(void) {
@@ -95,7 +88,7 @@ void printLoadMap(void) {
 		}
 		
 	}
-	printf("-----------------------------------\n                    total length %04X\n", TotalLen & 0XFFFF);
+	printf("-----------------------------------\n                    total length %04X\n", ProgLen & 0XFFFF);
 	return;
 }
 void copySymb(char* str1, char* str2) {
@@ -118,7 +111,7 @@ int loaderPass1(FILE** fp) {
 	ExSymSlot* symSlot;
 	CsAddr = ProgAddr;//initialize address of control section
 	ProgLen = 0;//initialize total length
-	for(int i=0; i<3; i++){//read each file
+	for(int i=0; i<3 && (*fp); i++){//read each file
 		while (!feof(*fp)) {//go through multiple control sections in a file
 			
 			fgets(line, OBJLINE_LEN, *fp);//read header line
@@ -187,6 +180,7 @@ int loaderPass1(FILE** fp) {
 			CsAddr += CsLth;//set starting address for next control section
 			ProgLen += CsLth;
 		}
+		fseek((*fp), 0, SEEK_SET);//move file pointer to the front
 		fp++;
 	}
 	return 0;
@@ -218,14 +212,12 @@ int loaderPass2(FILE** fp) {
 	char line[OBJLINE_LEN];//buffer to read a line from object code
 	long CsLth;//lenth of control section
 	char *strp;
-	char buf[50];
-	long addr, val;
-	int i;
+	long addr, val, len;
 	ExSymSlot* symSlot;
 	long symList[EXSYM_NUM];
 	CsAddr = ProgAddr;
 	
-	for (int i = 0; i < 3; i++) {//read each file
+	for (int i = 0; i < 3 && (*fp); i++) {//read each file
 		while (!feof(*fp)) {//go through multiple control sections in a file
 
 			fgets(line, OBJLINE_LEN, *fp);//read header line
@@ -264,8 +256,9 @@ int loaderPass2(FILE** fp) {
 				else if (line[0] == 'T') {//text record
 					strp = line + 9;//get starting point of object code
 					addr = CsAddr + toHex(line + 1, 6);//get real starting address of the line
-					for (i = 0; i < toHex(line + 7, 2); i++) {//load each byte of object code
-						Mem[addr + i] = (char)toHex(strp + i, 2);
+					len = toHex(line + 7, 2);
+					for (i = 0; i < len; i++) {//load each byte of object code
+						Mem[addr + i] = (char)toHex(strp + 2*i, 2);
 					}
 
 				}
@@ -290,19 +283,20 @@ int loaderPass2(FILE** fp) {
 	}
 	return 0;
 }
-int loadAsm(CmdTokens* tokens) {
+/* linking and loading object code */
+int loadObj(CmdTokens* tokens) {
 	FILE* fp[3] = { NULL, NULL, NULL };
 	//initialize
 	clearExSymTab();
-
+	
 	//open files
-	if (tokens->strpar) {
+	if (tokens->param_num == 1) {
 		fp[0] = fopen(tokens->strpar, "r");
 	}
-	if (tokens->strpar1) {
+	if (tokens->param_num == 2) {
 		fp[1] = fopen(tokens->strpar1, "r");
 	}
-	if (tokens->strpar2) {
+	if (tokens->param_num == 3) {
 		fp[2] = fopen(tokens->strpar2, "r");
 	}
 	
@@ -318,9 +312,10 @@ int loadAsm(CmdTokens* tokens) {
 	ExeAddr = ProgAddr;//set execution address
 
 	//close files
-	for (int i = 0; i < 3; i++) {
+	for (int i = 0; i < tokens->param_num; i++) {
 		fclose(fp[i]);
 	}
+	return 0;
 }
 /* sets program address */
 void setProaddr(CmdTokens* tokens) {
