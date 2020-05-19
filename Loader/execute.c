@@ -7,7 +7,7 @@
 long* BpList;
 int BpLen = 0;
 typedef enum {A, X, L, B, S, T, F, PC=8, SW} reg;
-long Reg[9];
+long Reg[10];
 
 typedef struct {
 	int r1;
@@ -61,9 +61,7 @@ int getFormat(int* mnem, char* mem) {
 			flag = 0;
 		}
 		switch (*mnem) {
-		case(TD): case(RD): case(WD):
-			return 1;
-		case(CLEAR):case(TIXR):
+		case(COMPR):case(CLEAR):case(TIXR):
 			return 2;
 		case(COMP):
 		case(J):
@@ -79,6 +77,9 @@ int getFormat(int* mnem, char* mem) {
 		case(STL):
 		case(STX):
 		case(STCH):
+		case(TD): 
+		case(RD): 
+		case(WD):
 			if ((mem[1] & 0X10) == 0X10)//check e bit from xbpe
 				return 4;
 			else
@@ -92,19 +93,30 @@ int getFormat(int* mnem, char* mem) {
 	return -1;//error
 }
 /* calculate target address */
-void getTA(int mnem, char* mem, Operand* op) {
-	int ni, xbpe, addr;
+void getTA(int mnem, unsigned char* mem, Operand* op) {
+	int ni, xbpe, addr, tmp;
 
 	ni = mem[0] % 4;//get ni
 	xbpe = mem[1] >> 4;//get xbpe
 
 	//get specified address
 	if ((xbpe & 1) == 1) {//format 4
-		addr = (mem[1] % 0X10) * 0X10000 + mem[2] * 0X100 + mem[3];
+		addr = (mem[1] & 0x0F) * 0X10000 + mem[2] * 0X100 + mem[3];
+		//2's complement
+		if (addr > 0x7FFFF) {
+			addr = (0xFFFFF - addr) + 1;
+			addr = (~addr) + 1;
+		}
 	}
 	else {//format 3
-		addr = (mem[1] % 0X10) * 0X100 + mem[2];
+		addr = (mem[1] & 0x0F) * 0X100 + mem[2];
+		//2's complement
+		if (addr > 0x7FF) {
+			addr = (0xFFF - addr) + 1;
+			addr = (~addr) + 1;
+		}
 	}
+	
 	//pc relative 
 	if ((xbpe & 2) == 2){
 		addr += Reg[PC];
@@ -124,7 +136,13 @@ void getTA(int mnem, char* mem, Operand* op) {
 		op->val = addr;
 		break;
 	case(2)://indirect addressing
-		op->addr = Mem[addr];
+		if ((xbpe & 1) == 1) {//format 4
+			op->addr = Mem[addr] * 0X1000000 + Mem[addr + 1] * 0X10000 + Mem[addr + 2] * 0X100 + Mem[addr + 3];
+		}
+		else {
+			op->addr = Mem[addr] * 0X10000 + Mem[addr + 1] * 0X100 + Mem[addr + 2];
+		}
+		
 		break;
 	case(3)://simple addressing
 		op->addr = addr;
@@ -152,19 +170,28 @@ void exeInstruct(int mnem, Operand* op) {
 	val = op->val;
 
 	if (addr) {
-		m6 = 0;
-		//calculate floating point value
+		m3 = 0;
+		//calculate target value 
 		for (i = 0;; i++) {
+			m3 += Mem[addr + i];
+			if (i == 2)
+				break;
+			m3 = m3 << 8;
+		}
+		m6 = m3 << 8;
+		//calculate floating point value
+		for (i = 3;; i++) {
 			m6 += Mem[addr + i];
 			if (i == 5)
 				break;
 			m6 = m6 << 8;
 		}
-		//calculate target value
-		m3 = m6 >> 24;
 	}
 	else if (val) {
 		m3 = m6 = val;
+	}
+	else {
+		m3 = m6 = 0;
 	}
 
 	switch (mnem) {
@@ -176,6 +203,17 @@ void exeInstruct(int mnem, Operand* op) {
 			Reg[SW] = '>';
 		}
 		else if (Reg[A] == m3) {
+			Reg[SW] = '=';
+		}
+		else {
+			Reg[SW] = '<';
+		}
+		break;
+	case(COMPR):
+		if (Reg[r1] > Reg[r2]) {
+			Reg[SW] = '>';
+		}
+		else if (Reg[r1] == Reg[r2]) {
 			Reg[SW] = '=';
 		}
 		else {
@@ -280,10 +318,14 @@ int runProgram(void) {
 	int flag = 1, mnem, format;
 	long cur;
 	Operand operand;
-	memset(Reg, 0, 9 * sizeof(long));//reset registers
+
+	if (ExeAddr == ProgAddr) {//starting point
+		memset(Reg, 0, 9 * sizeof(long));//reset registers
+		Reg[L] = ProgLen;
+	}
+	
 	//initialize registers
 	Reg[PC] = ExeAddr;
-	Reg[L] = ProgLen;
 	
 	while (1) {
 
@@ -337,8 +379,7 @@ void main(void) {
 	strcpy(tokens->strpar, "copy.obj"); 
 	tokens->param_num = 1;
 	loadObj(tokens);
-	tokens->par1 = 0X4000;
-	setProaddr(tokens1);
+	
 
 	strcpy(tokens2->strpar, "3");
 	setBp(tokens2);
@@ -353,7 +394,8 @@ void main(void) {
 	runProgram();
 	runProgram();
 	runProgram();
-	
+	tokens->par1 = 0X4000;
+	setProaddr(tokens1);
 	free(BpList);
 	free(tokens); free(tokens1); free(tokens2);
 	return;
