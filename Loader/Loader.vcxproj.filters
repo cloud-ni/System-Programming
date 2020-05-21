@@ -15,10 +15,10 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Loader.c">
+    <ClCompile Include="execute-prev.c">
       <Filter>소스 파일</Filter>
     </ClCompile>
-    <ClCompile Include="execute.c">
+    <ClCompile Include="loader-prev.c">
       <Filter>소스 파일</Filter>
     </ClCompile>
   </ItemGroup>

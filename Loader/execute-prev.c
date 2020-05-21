@@ -553,14 +553,13 @@ void main(void) {
 	ExeProgAddr = 0;
 
 
-	
+	///////proga, progb, progc
 	tokens->par1 = 0X4000;
 	setProaddr(tokens);
 
-	
-	strcpy(tokens->strpar, "a.obj"); 
-	strcpy(tokens->strpar1, "b.obj");
-	strcpy(tokens->strpar2, "c.obj");
+	strcpy(tokens->strpar, "proga.obj"); 
+	strcpy(tokens->strpar1, "progb.obj");
+	strcpy(tokens->strpar2, "progc.obj");
 	tokens->param_num = 3;
 	loadObj(tokens);
 	
@@ -582,7 +581,7 @@ void main(void) {
 	
 	
 
-
+	/////////copy.obj
 	tokens->par1 = 0;
 	setProaddr(tokens);
 
@@ -606,9 +605,6 @@ void main(void) {
 
 	}
 	
-
-	
-
 	strcpy(tokens2->strpar, "3");
 	setBp(tokens2);
 	strcpy(tokens2->strpar, "2a");
@@ -617,15 +613,13 @@ void main(void) {
 	setBp(tokens2);
 	printBp();
 
-
-	
 	runProgram();
 	runProgram();
 	runProgram();
 	runProgram();
 
 	
-
+	//free 
 	free(BpList);
 	free(tokens); free(tokens1); free(tokens2);
 	return;

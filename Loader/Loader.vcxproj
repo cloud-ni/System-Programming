@@ -19,8 +19,8 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="execute.c" />
-    <ClCompile Include="Loader.c" />
+    <ClCompile Include="execute-prev.c" />
+    <ClCompile Include="loader-prev.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="execute.h" />
