@@ -1,7 +1,7 @@
 #pragma warning(disable : 4996)
 #include "main.h"
 #include "loader.h"
-
+#include "execute.h"
 
 
 /* create new external symbol slot */
@@ -88,7 +88,7 @@ void printLoadMap(void) {
 		}
 		
 	}
-	printf("-----------------------------------\n                    total length %04X\n", ProgLen & 0XFFFF);
+	printf("-----------------------------------\n                  total length %04X\n", ProgLen & 0XFFFF);
 	return;
 }
 void copySymb(char* str1, char* str2) {
@@ -107,10 +107,13 @@ int loaderPass1(FILE** fp) {
 	long CsLth;//length of control section
 	char *strp;
 	char addr[10];
+	char progName[20];
 	int labelIdx;
 	ExSymSlot* symSlot;
 	CsAddr = ProgAddr;//initialize address of control section
 	ProgLen = 0;//initialize total length
+	clearExSymTab();
+
 	for(int i=0; i<3 && (*fp); i++){//read each file
 		while (!feof(*fp)) {//go through multiple control sections in a file
 			
@@ -123,9 +126,10 @@ int loaderPass1(FILE** fp) {
 				continue;
 
 			strp = strtok(line, " ");//get control section name
+			strcpy(progName, strp + 1);//save program name
 			symSlot = getExSym(strp + 1);//find symbol from ExSymTab
 			if (symSlot) {//found cs name from ExSymTab
-				printf("Error: duplicate external symbol");
+				printf("Error from pass1: Duplicate program name '%s'\n", symSlot->symb);
 				return -1;
 			}
 			//not found, create new ExSym slot
@@ -137,7 +141,7 @@ int loaderPass1(FILE** fp) {
 			symSlot->len = strtol(strp + 6, NULL, 16);//save CS length
 			CsLth = symSlot->len;//remember CS length
 			strp[6] = '\0';
-			symSlot->addr = strtol(strp, NULL, 16);//save CS address
+			symSlot->addr = CsAddr + strtol(strp, NULL, 16);//save CS address
 			insertExSymTab(symSlot);//insert the slot into ExSymTab
 
 			while (1) {
@@ -157,7 +161,7 @@ int loaderPass1(FILE** fp) {
 						//search ExSymTab for symbol name
 						symSlot = getExSym(strp + labelIdx);
 						if (symSlot) {//found 
-							printf("Error: duplicate external symbol");
+							printf("Error from pass1: Duplicate external symbol '%s' in program '%s'\n", symSlot->symb, progName);
 							return -1;
 						}
 						//not found, create new ExSym slot
@@ -213,12 +217,15 @@ int loaderPass2(FILE** fp) {
 	long CsLth;//lenth of control section
 	char *strp;
 	long addr, val, len;
+	char progName[20];
 	ExSymSlot* symSlot;
 	long symList[EXSYM_NUM];
 	CsAddr = ProgAddr;
 	
 	for (int i = 0; i < 3 && (*fp); i++) {//read each file
 		while (!feof(*fp)) {//go through multiple control sections in a file
+
+			memset(symList, 0, EXSYM_NUM*sizeof(long));//initialize 
 
 			fgets(line, OBJLINE_LEN, *fp);//read header line
 			if (line[strlen(line) - 1] == '\n') {
@@ -229,8 +236,16 @@ int loaderPass2(FILE** fp) {
 				continue;
 			
 			strp = strtok(line, " ");
-			strp = strtok(NULL, " ");//get control section address and length
-			CsLth = strtol(strp + 6, NULL, 16);//remember CS length
+			strcpy(progName, strp + 1);
+			symSlot = getExSym(strp + 1);//search ExSymTab for program address
+			if (!symSlot) {//symbol not found
+				printf("Error from pass2: Undefined Program '%s'\n", strp + 1);
+				memset(Mem + ProgAddr, 0, sizeof(Mem[0])*ProgLen);//unload program
+				return -1;
+			}
+			
+			symList[1] = symSlot->addr;//save address in symbol list
+			CsLth = symSlot->len;//save control section length
 
 			while (1) {
 				fgets(line, OBJLINE_LEN, *fp); //read next line
@@ -245,11 +260,12 @@ int loaderPass2(FILE** fp) {
 					while (strp) {
 						symSlot = getExSym(strp + 2);//search ExSymTab for symbol name
 						if (!symSlot) {//symbol not found
-							printf("Error: Undefined External Symbol\n");
+							printf("Error from pass2: Undefined External Symbol '%s' in program '%s'\n", strp + 2, progName);
+							memset(Mem + ProgAddr, 0, sizeof(Mem[0])*ProgLen);//unload program
 							return -1;
 						}
 						//save address in the reference number
-						symList[(int)toHex(strp, 2)] = symSlot->addr;
+						symList[atoi(strp)] = symSlot->addr;
 						strp = strtok(NULL, " ");//get next token
 					}
 				}
@@ -258,22 +274,31 @@ int loaderPass2(FILE** fp) {
 					addr = CsAddr + toHex(line + 1, 6);//get real starting address of the line
 					len = toHex(line + 7, 2);
 					for (i = 0; i < len; i++) {//load each byte of object code
+						if (addr + i >= MEMORY_SIZE) {//memory bound error
+							printf("Error from pass2: No more memory can be loaded because the memory address exceeded FFFFF. Address range: [0, FFFFF]\n");
+							return -1;
+						}
 						Mem[addr + i] = (char)toHex(strp + 2*i, 2);
 					}
 
 				}
 				else if (line[0] == 'M') {//modification record
 					addr = CsAddr + toHex(line + 1, 6);//get real starting address of modify code
+					if (addr < 0 || addr + 2 >= MEMORY_SIZE) {//memory bound error;
+						printf("Error from pass2: Modfication code address is out of memory bound. Address range: [0, FFFFF]\n");
+						return -1;
+					}
 					//get the current value in the address
-					val = Mem[addr] * 0X100 + Mem[addr + 1] * 0X10 + Mem[addr + 2];
+					val = Mem[addr] * 0X10000 + Mem[addr + 1] * 0X100 + Mem[addr + 2];
 					if (line[9] == '+') {//add referenced address
-						val += symList[toHex(line + 10, 2)];
+						val += symList[atoi(line + 10)];
 					}
 					else if (line[9] == '-') {//subtract referenced address
-						val -= symList[toHex(line + 10, 2)];
+						val -= symList[atoi(line + 10)];
 					}
-					for (i = 0; i < 3; i++) {//load each byte of new address
-						Mem[addr + i] = (val >> ((2 - i) * 4)) & 0XF;
+					for (i = 2; i >= 0; i--) {//load each byte of new address
+						Mem[addr + i] = val & 0XFF;
+						val = val >> 8;
 					}
 				}
 			}
@@ -285,18 +310,18 @@ int loaderPass2(FILE** fp) {
 }
 /* linking and loading object code */
 int loadObj(CmdTokens* tokens) {
-	FILE* fp[3] = { NULL, NULL, NULL };
+	FILE* fp[4] = { NULL, NULL, NULL, NULL };
 	//initialize
 	clearExSymTab();
-	
+
 	//open files
-	if (tokens->param_num == 1) {
+	if (tokens->param_num >= 1) {
 		fp[0] = fopen(tokens->strpar, "r");
 	}
-	if (tokens->param_num == 2) {
+	if (tokens->param_num >= 2) {
 		fp[1] = fopen(tokens->strpar1, "r");
 	}
-	if (tokens->param_num == 3) {
+	if (tokens->param_num >= 3) {
 		fp[2] = fopen(tokens->strpar2, "r");
 	}
 	
@@ -304,21 +329,29 @@ int loadObj(CmdTokens* tokens) {
 	if (loaderPass1(fp)) {
 		return -1;
 	}
+
 	//run pass2
 	if (loaderPass2(fp)) {
 		return -1;
 	}
 
-	ExeAddr = ProgAddr;//set execution address
-
 	//close files
 	for (int i = 0; i < tokens->param_num; i++) {
 		fclose(fp[i]);
 	}
+
+	memset(Reg, 0, 10 * sizeof(long));//reset registers
+	Reg[L] = ProgLen;
+	ExeAddr = ProgAddr;//set execution address
+
 	return 0;
 }
 /* sets program address */
-void setProaddr(CmdTokens* tokens) {
+int setProaddr(CmdTokens* tokens) {
+	if (tokens->par1 < 0 || tokens->par1 >= 0x100000) {//input bound error
+		printf("Address Out of Memory Bound. Address range: [0, FFFFF]\n");
+		return -1;
+	}
 	ProgAddr = tokens->par1;
-	return;
+	return 0;
 }

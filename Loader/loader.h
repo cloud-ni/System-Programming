@@ -14,14 +14,17 @@ ExSymSlot* ExSymTab[EXSYMTAB_LEN]; //external symbol table
 long CsAddr;//control section address
 long ProgAddr;//program load address
 long ProgLen;//total length of loaded program
+long ExeProgLen;//total length of program in execution
 long ExeAddr;//execution address
+long ExeProgAddr;//prgram address in execution
+
 long toHex(char* str, int len);
 
 int loaderPass2(FILE ** fp);
 
 int loadObj(CmdTokens * tokens);
 
-void setProaddr(CmdTokens * tokens);
+int setProaddr(CmdTokens * tokens);
 
 ExSymSlot * newExSymSlot(void);
 

@@ -19,6 +19,7 @@
 #define MEMORY_SIZE 0x100000
 unsigned char Mem[MEMORY_SIZE];//one char = one byte
 
+
 typedef enum {
 	help, dir, quit, history, dump, edit, fill, reset, opcode, opcodelist,
 	assemble, type, symbol, null

@@ -1,3 +1,11 @@
+typedef enum { A, X, L, B, S, T, F, PC = 8, SW } reg;
+long Reg[10];
+typedef struct {
+	int r1;
+	int r2;
+	long addr;
+	long val;
+} Operand;
 typedef enum {
 	ADD = 0x18,
 	ADDF = 0x58,
@@ -59,3 +67,25 @@ typedef enum {
 	TIXR = 0xB8,
 	WD = 0xDC
 } Mnemonic;
+
+int setBp(CmdTokens * tokens);
+
+int isBp(long addr);
+
+void clearBp(void);
+
+void printBp(void);
+
+int getFormat(int * mnem, char * mem);
+
+void getTA(int mnem, unsigned char * mem, Operand * op);
+
+void storeMem(long val, long addr, int len);
+
+int exeInstruct(int mnem, Operand * op);
+
+void printReg(void);
+
+void initOperand(Operand * operand);
+
+int runProgram(void);
