@@ -21,6 +21,27 @@
     <ClCompile Include="loader-prev.c">
       <Filter>소스 파일</Filter>
     </ClCompile>
+    <ClCompile Include="execute.c">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="loader.c">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="20170001.c">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="assembler.c">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="memory.c">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="opcode.c">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="shell.c">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="main.h">
@@ -32,5 +53,33 @@
     <ClInclude Include="loader.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
+    <ClInclude Include="20170001.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="assembler.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="memory.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="opcode.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="shell.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Makefile" />
+    <None Include="README" />
+  </ItemGroup>
+  <ItemGroup>
+    <Object Include="copy.obj" />
+    <Object Include="proga.obj" />
+    <Object Include="progb.obj" />
+    <Object Include="progc.obj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="opcode.txt" />
   </ItemGroup>
 </Project>

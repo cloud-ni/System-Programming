@@ -1,19 +1,27 @@
-#pragma warning(disable : 4996)
-#include "main.h"
+#include "20170001.h"
 #include "execute.h"
 #include "loader.h"
-
-#define BPLIST_LEN 50
-long* BpList;
-int BpLen = 0;
 
 /* set new breakpoint */
 int setBp(CmdTokens* tokens) {
 	long addr;
 	addr = strtol(tokens->strpar, NULL, 16);//get breakpoint address
 	if (addr < ProgAddr || addr >= ProgAddr + ProgLen || addr < 0 || addr >= MEMORY_SIZE) {//bp out of boundary
-		printf("Error: The breakpoint is out of the program address range. Currant Program range is [0x%X, 0x%X]\n", ProgAddr, ProgAddr + ProgLen - 1);
+	
+		if (ProgLen == 0) {
+			printf("Error: Unable to set breakpoint. No loaded program on the memory.\n");
+		}
+		else {
+			printf("Error: The breakpoint is out of the program address range."
+				" Current Program range is [0x%X, 0x%X]\n",
+				(unsigned int)ProgAddr, (unsigned int)(ProgAddr + ProgLen - 1));
+		}
+		
 		return -1;
+	}
+	if (isBp(addr)) {
+		printf("        The breakpoint already exists\n");
+		return 0;
 	}
 	if (BpLen == 0) {//allocate memory 
 		BpList = (long*)malloc(BPLIST_LEN * sizeof(long));
@@ -22,7 +30,7 @@ int setBp(CmdTokens* tokens) {
 		BpList = (long*)realloc(BpList, sizeof(BpList) + BPLIST_LEN * sizeof(long));
 	}
 	BpList[BpLen] = addr;//save breakbpoint
-	printf("        [ok] create breakpoint %04X\n", BpList[BpLen] & 0XFFFF );
+	printf("        [ok] create breakpoint %04X\n", (unsigned int)(BpList[BpLen] & 0XFFFF));
 	BpLen++;
 	return 0;
 }
@@ -43,6 +51,7 @@ void clearBp(void) {
 	}
 	free(BpList);
 	BpList = NULL;
+	BpLen = 0;
 	printf("        [ok] clear all breakpoints\n");
 	return;
 }
@@ -51,12 +60,12 @@ void printBp(void) {
 	int i;
 	printf("        breakpoint\n        -----------\n");
 	for (i = 0; i < BpLen; i++) {//move through BpList
-		printf("        %X\n", BpList[i]);
+		printf("        %X\n", (unsigned int)BpList[i]);
 	}
 	return;
 }
 /* returns format */
-int getFormat(int* mnem, char* mem) {
+int getFormat(int* mnem, unsigned char* mem) {
 	int flag = 1;
 	for (int i = 0; i < 2 && flag; i++) {
 		if (flag) {//reset flag
@@ -133,9 +142,9 @@ void getTA(int mnem, unsigned char* mem, Operand* op) {
 			addr = (~addr) + 1;
 		}
 	}
-	
+
 	//pc relative 
-	if ((xbpe & 2) == 2){
+	if ((xbpe & 2) == 2) {
 		addr += Reg[PC];
 	}
 	//base relative
@@ -146,7 +155,7 @@ void getTA(int mnem, unsigned char* mem, Operand* op) {
 	if ((xbpe & 8) == 8) {
 		addr += Reg[X];
 	}
-	
+
 	//addressing mode
 	switch (ni) {
 	case(1)://immediate addressing
@@ -159,7 +168,7 @@ void getTA(int mnem, unsigned char* mem, Operand* op) {
 		else {
 			op->addr = Mem[addr] * 0X10000 + Mem[addr + 1] * 0X100 + Mem[addr + 2];
 		}
-		
+
 		break;
 	case(3)://simple addressing
 		op->addr = addr;
@@ -172,7 +181,7 @@ void getTA(int mnem, unsigned char* mem, Operand* op) {
 /* store value in a register to memory */
 void storeMem(long val, long addr, int len) {
 	//store each byte starting from the last byte
-	for (int i = len-1; i >= 0; i--) { 
+	for (int i = len - 1; i >= 0; i--) {
 		Mem[addr + i] = (char)(val % 0X100);
 		val = val / 0X100;
 	}
@@ -366,7 +375,7 @@ int exeInstruct(int mnem, Operand* op) {
 		Reg[r1] = (Reg[r1] << (r2 + 1)) | (Reg[r1] >> (8 - (r2 + 1)));
 		break;
 	case SHIFTR:
-		Reg[r1] = (Reg[r1] >> (r2 + 1)) | ((Reg[r1] / 0X800)*(0XFFF << (24 - (r2 + 1)))) ;
+		Reg[r1] = (Reg[r1] >> (r2 + 1)) | ((Reg[r1] / 0X800)*(0XFFF << (24 - (r2 + 1))));
 		break;
 	case SIO:
 		break;
@@ -456,14 +465,14 @@ void printReg(void) {
 	printf("L  :  %06X  PC  :  %06X\n", (unsigned int)(Reg[L] & 0XFFFFFF), (unsigned int)(Reg[PC] & 0XFFFFFF));
 	printf("B  :  %06X   S  :  %06X\n", (unsigned int)(Reg[B] & 0XFFFFFF), (unsigned int)(Reg[S] & 0XFFFFFF));
 	printf("T  :  %06X   \n", (unsigned int)(Reg[T] & 0XFFFFFF));
-	
+
 	if (Reg[PC] == ExeProgLen) {
 		printf("               End Program\n");
 	}
 	else {
-		printf("               Stop at checkpoint[%X]\n", Reg[PC]);
+		printf("               Stop at checkpoint[%X]\n", (unsigned int)Reg[PC]);
 	}
-	
+
 	return;
 }
 /* initialize Operand */
@@ -476,23 +485,20 @@ void initOperand(Operand* operand) {
 }
 /* run the program */
 int runProgram(void) {
-	int flag = 1, mnem, format;
+	int mnem, format;
 	long cur;
 	Operand operand;
 
-	
-	if (ExeAddr == ExeProgAddr) {//execution started
+	if (ExeAddr == ExeProgAddr || ExeProgAddr != ProgAddr) {//execution started
 		ExeProgLen = ProgLen;
 		Reg[L] = ProgLen;
-		if (ExeProgAddr != ProgAddr) {//set ExeAddr as new ProgAddr
-			ExeProgAddr = ProgAddr;
-			ExeAddr = ProgAddr;
-		}
+		ExeProgAddr = ProgAddr;//set ExeAddr as new ProgAddr
+		ExeAddr = ProgAddr;
 	}
-	
+
 	//initialize registers
 	Reg[PC] = ExeAddr;
-	
+
 	while (1) {
 
 		cur = Reg[PC];//save processing address
@@ -502,7 +508,7 @@ int runProgram(void) {
 		format = getFormat(&mnem, Mem + cur);//get format
 		Reg[PC] += format;//update program counter
 
- 		switch (format) {
+		switch (format) {
 		case(2):
 			//get r1 and r2 from object code
 			operand.r1 = Mem[cur + 1];
@@ -524,7 +530,6 @@ int runProgram(void) {
 		if (Reg[PC] == ExeProgLen) {//reached last code in the program
 			printReg();//print registers
 			memset(Reg, 0, 10 * sizeof(long));//reset registers
-			Reg[L] = ProgLen;
 			ExeAddr = ProgAddr;//reset execution address
 			ExeProgAddr = ProgAddr;
 			ExeProgLen = ProgLen;
@@ -537,90 +542,6 @@ int runProgram(void) {
 		}
 
 	}
-	
+
 	return 0;
-}
-
-
-void main(void) {
-	CmdTokens* tokens = (CmdTokens*)malloc(sizeof(CmdTokens));
-	CmdTokens* tokens1 = (CmdTokens*)malloc(sizeof(CmdTokens));
-	CmdTokens* tokens2 = (CmdTokens*)malloc(sizeof(CmdTokens));
-	
-	//initialize
-	ProgAddr = 0;
-	ExeAddr = 0;
-	ExeProgAddr = 0;
-
-
-	///////proga, progb, progc
-	tokens->par1 = 0X4000;
-	setProaddr(tokens);
-
-	strcpy(tokens->strpar, "proga.obj"); 
-	strcpy(tokens->strpar1, "progb.obj");
-	strcpy(tokens->strpar2, "progc.obj");
-	tokens->param_num = 3;
-	loadObj(tokens);
-	
-	for (int i = ProgAddr; i <= ProgAddr + ProgLen; i++) {
-		if (i % 0x10 == 0) {
-			printf("\n");
-			printf("%04X ", i);
-		}
-		if (i % 4 == 0) {
-			printf(" ");
-		}
-		printf("%02X.", Mem[i]);
-		
-	}
-	
-	tokens->par1 = 0X4000;
-	setProaddr(tokens);
-	runProgram();
-	
-	
-
-	/////////copy.obj
-	tokens->par1 = 0;
-	setProaddr(tokens);
-
-	strcpy(tokens->strpar, "copy.obj");
-	tokens->param_num = 1;
-	loadObj(tokens);
-
-	for (int i = ProgAddr; i <= ProgAddr + ProgLen; i++) {
-
-		if (i >= 0x30 && i < 0x1030) {
-			continue;
-		}
-		if (i % 0x10 == 0) {
-			printf("\n");
-			printf("%04X ", i);
-		}
-		if (i % 4 == 0) {
-			printf(" ");
-		}
-		printf("%02X.", Mem[i]);
-
-	}
-	
-	strcpy(tokens2->strpar, "3");
-	setBp(tokens2);
-	strcpy(tokens2->strpar, "2a");
-	setBp(tokens2);
-	strcpy(tokens2->strpar, "1046");
-	setBp(tokens2);
-	printBp();
-
-	runProgram();
-	runProgram();
-	runProgram();
-	runProgram();
-
-	
-	//free 
-	free(BpList);
-	free(tokens); free(tokens1); free(tokens2);
-	return;
 }

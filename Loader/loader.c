@@ -1,5 +1,4 @@
-#pragma warning(disable : 4996)
-#include "main.h"
+#include "20170001.h"
 #include "loader.h"
 #include "execute.h"
 
@@ -41,7 +40,7 @@ void insertExSymTab(ExSymSlot *newSlot) {
 	return;
 }
 
-/* get external symbol 
+/* get external symbol
 returns NULL if not found */
 ExSymSlot* getExSym(char * symb) {
 	ExSymSlot *cur;
@@ -79,21 +78,21 @@ void printLoadMap(void) {
 		cur = ExSymTab[i];
 		while (cur) {
 			if (cur->csFlag == 1) {//control section
-				printf("%-10s          %04X    %04X\n",cur->symb, cur->addr & 0XFFFF, cur->len & 0XFFFF);
+				printf("%-10s          %04X    %04X\n", cur->symb, (unsigned int)(cur->addr & 0XFFFF), (unsigned int)(cur->len & 0XFFFF));
 			}
 			else {//symbol name
-				printf("          %6s    %04X\n", cur->symb, cur->addr & 0XFFFF);
+				printf("          %6s    %04X\n", cur->symb, (unsigned int)(cur->addr & 0XFFFF));
 			}
 			cur = cur->next;
 		}
-		
+
 	}
-	printf("-----------------------------------\n                  total length %04X\n", ProgLen & 0XFFFF);
+	printf("-----------------------------------\n                  total length %04X\n", (unsigned int)(ProgLen & 0XFFFF));
 	return;
 }
 void copySymb(char* str1, char* str2) {
 	int i = 0;
-	while(str1[i] == ' ' || str1[i] == '\0') {
+	while (str1[i] == ' ' || str1[i] == '\0') {
 		str2[i] = str1[i];
 		i++;
 	}
@@ -110,13 +109,14 @@ int loaderPass1(FILE** fp) {
 	char progName[20];
 	int labelIdx;
 	ExSymSlot* symSlot;
+	
 	CsAddr = ProgAddr;//initialize address of control section
 	ProgLen = 0;//initialize total length
 	clearExSymTab();
 
-	for(int i=0; i<3 && (*fp); i++){//read each file
+	for (int i = 0; i < 3 && (*fp); i++) {//read each file
 		while (!feof(*fp)) {//go through multiple control sections in a file
-			
+
 			fgets(line, OBJLINE_LEN, *fp);//read header line
 			if (line[strlen(line) - 1] == '\n') {
 				line[strlen(line) - 1] = '\0';
@@ -157,7 +157,7 @@ int loaderPass1(FILE** fp) {
 				if (line[0] == 'D') {//define record
 					strp = strtok(line, " ");//get first token
 					labelIdx = 1;//symbol name starts from index 1
-					while (strp[6]!='\0' || labelIdx == 1) {//while next symbol exists or it is first symbol
+					while (strp[6] != '\0' || labelIdx == 1) {//while next symbol exists or it is first symbol
 						//search ExSymTab for symbol name
 						symSlot = getExSym(strp + labelIdx);
 						if (symSlot) {//found 
@@ -189,15 +189,15 @@ int loaderPass1(FILE** fp) {
 	}
 	return 0;
 }
-/* converting string to hex integer 
+/* converting string to hex integer
 len: the length of digits */
 long toHex(char* str, int len) {
 	int i, digit;
 	long res = 0;
-	for (i = len-1; i >= 0; i--) {//go through each index from the smallest digit
+	for (i = len - 1; i >= 0; i--) {//go through each index from the smallest digit
 		digit = len - i - 1;
 		if (str[i] >= '0' && str[i] <= '9') {
-			res += (str[i]-'0')*(1 << (digit * 4));
+			res += (str[i] - '0')*(1 << (digit * 4));
 		}
 		else if (str[i] >= 'A' && str[i] <= 'F') {
 			res += (str[i] - 'A' + 10)*(1 << (digit * 4));
@@ -221,11 +221,11 @@ int loaderPass2(FILE** fp) {
 	ExSymSlot* symSlot;
 	long symList[EXSYM_NUM];
 	CsAddr = ProgAddr;
-	
+
 	for (int i = 0; i < 3 && (*fp); i++) {//read each file
 		while (!feof(*fp)) {//go through multiple control sections in a file
 
-			memset(symList, 0, EXSYM_NUM*sizeof(long));//initialize 
+			memset(symList, 0, EXSYM_NUM * sizeof(long));//initialize 
 
 			fgets(line, OBJLINE_LEN, *fp);//read header line
 			if (line[strlen(line) - 1] == '\n') {
@@ -234,7 +234,7 @@ int loaderPass2(FILE** fp) {
 
 			if (line[0] == '.')//check if it is comment
 				continue;
-			
+
 			strp = strtok(line, " ");
 			strcpy(progName, strp + 1);
 			symSlot = getExSym(strp + 1);//search ExSymTab for program address
@@ -243,7 +243,7 @@ int loaderPass2(FILE** fp) {
 				memset(Mem + ProgAddr, 0, sizeof(Mem[0])*ProgLen);//unload program
 				return -1;
 			}
-			
+
 			symList[1] = symSlot->addr;//save address in symbol list
 			CsLth = symSlot->len;//save control section length
 
@@ -278,7 +278,7 @@ int loaderPass2(FILE** fp) {
 							printf("Error from pass2: No more memory can be loaded because the memory address exceeded FFFFF. Address range: [0, FFFFF]\n");
 							return -1;
 						}
-						Mem[addr + i] = (char)toHex(strp + 2*i, 2);
+						Mem[addr + i] = (char)toHex(strp + 2 * i, 2);
 					}
 
 				}
@@ -304,6 +304,7 @@ int loaderPass2(FILE** fp) {
 			}
 			CsAddr += CsLth;//set starting address for next control section
 		}
+		fseek((*fp), 0, SEEK_SET);//move file pointer to the front
 		fp++;
 	}
 	return 0;
@@ -324,7 +325,7 @@ int loadObj(CmdTokens* tokens) {
 	if (tokens->param_num >= 3) {
 		fp[2] = fopen(tokens->strpar2, "r");
 	}
-	
+
 	//run pass1
 	if (loaderPass1(fp)) {
 		return -1;
@@ -340,6 +341,8 @@ int loadObj(CmdTokens* tokens) {
 		fclose(fp[i]);
 	}
 
+	printLoadMap();
+
 	memset(Reg, 0, 10 * sizeof(long));//reset registers
 	Reg[L] = ProgLen;
 	ExeAddr = ProgAddr;//set execution address
@@ -348,10 +351,12 @@ int loadObj(CmdTokens* tokens) {
 }
 /* sets program address */
 int setProaddr(CmdTokens* tokens) {
-	if (tokens->par1 < 0 || tokens->par1 >= 0x100000) {//input bound error
-		printf("Address Out of Memory Bound. Address range: [0, FFFFF]\n");
+	long addr;
+	addr = strtol(tokens->strpar, NULL, 16);
+	if (addr < 0 || addr >= 0x100000) {//input bound error
+		printf("Error: Address Out of Memory Bound. Address range: [0x0, 0xFFFFF]\n");
 		return -1;
 	}
-	ProgAddr = tokens->par1;
+	ProgAddr = addr;
 	return 0;
 }

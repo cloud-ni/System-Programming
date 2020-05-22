@@ -1,11 +1,16 @@
 typedef enum { A, X, L, B, S, T, F, PC = 8, SW } reg;
 long Reg[10];
+
 typedef struct {
 	int r1;
 	int r2;
 	long addr;
 	long val;
 } Operand;
+
+long* BpList;
+int BpLen;
+
 typedef enum {
 	ADD = 0x18,
 	ADDF = 0x58,
@@ -76,7 +81,7 @@ void clearBp(void);
 
 void printBp(void);
 
-int getFormat(int * mnem, char * mem);
+int getFormat(int * mnem, unsigned char * mem);
 
 void getTA(int mnem, unsigned char * mem, Operand * op);
 

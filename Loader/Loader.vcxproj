@@ -19,13 +19,44 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="20170001.c">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="assembler.c" />
     <ClCompile Include="execute-prev.c" />
+    <ClCompile Include="execute.c" />
     <ClCompile Include="loader-prev.c" />
+    <ClCompile Include="loader.c" />
+    <ClCompile Include="memory.c" />
+    <ClCompile Include="opcode.c" />
+    <ClCompile Include="shell.c" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="20170001.h">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+    </ClInclude>
+    <ClInclude Include="assembler.h" />
     <ClInclude Include="execute.h" />
     <ClInclude Include="loader.h" />
     <ClInclude Include="main.h" />
+    <ClInclude Include="memory.h" />
+    <ClInclude Include="opcode.h" />
+    <ClInclude Include="shell.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Makefile" />
+    <None Include="README" />
+  </ItemGroup>
+  <ItemGroup>
+    <Object Include="copy.obj" />
+    <Object Include="proga.obj" />
+    <Object Include="progb.obj" />
+    <Object Include="progc.obj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="opcode.txt" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>15.0</VCProjectVersion>
