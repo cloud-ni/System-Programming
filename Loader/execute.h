@@ -81,16 +81,16 @@ void clearBp(void);
 
 void printBp(void);
 
+int runProgram(void);
+
+void initOperand(Operand * operand);
+
 int getFormat(int * mnem, unsigned char * mem);
 
 void getTA(int mnem, unsigned char * mem, Operand * op);
 
-void storeMem(long val, long addr, int len);
-
 int exeInstruct(int mnem, Operand * op);
 
+void storeMem(long val, long addr, int len);
+
 void printReg(void);
-
-void initOperand(Operand * operand);
-
-int runProgram(void);

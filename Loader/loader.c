@@ -5,7 +5,7 @@
 
 /* create new external symbol slot */
 ExSymSlot* newExSymSlot(void) {
-	ExSymSlot *newSlot = (ExSymSlot*)malloc(sizeof(ExSymSlot));//allocate memory]
+	ExSymSlot *newSlot = (ExSymSlot*)malloc(sizeof(ExSymSlot));//allocate memory
 	//initialize
 	newSlot->addr = 0;
 	newSlot->len = 0;
@@ -88,15 +88,6 @@ void printLoadMap(void) {
 
 	}
 	printf("-----------------------------------\n                  total length %04X\n", (unsigned int)(ProgLen & 0XFFFF));
-	return;
-}
-void copySymb(char* str1, char* str2) {
-	int i = 0;
-	while (str1[i] == ' ' || str1[i] == '\0') {
-		str2[i] = str1[i];
-		i++;
-	}
-	str2[i] = '\0';
 	return;
 }
 

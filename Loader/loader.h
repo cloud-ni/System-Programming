@@ -18,12 +18,6 @@ long ExeProgLen;//total length of program in execution
 long ExeAddr;//execution address
 long ExeProgAddr;//prgram address in execution
 
-long toHex(char* str, int len);
-
-int loaderPass2(FILE ** fp);
-
-int loadObj(CmdTokens * tokens);
-
 int setProaddr(CmdTokens * tokens);
 
 ExSymSlot * newExSymSlot(void);
@@ -36,8 +30,12 @@ ExSymSlot * getExSym(char * symb);
 
 void clearExSymTab(void);
 
-void printLoadMap(void);
-
-void copySymb(char * str1, char * str2);
+int loadObj(CmdTokens * tokens);
 
 int loaderPass1(FILE ** fp);
+
+int loaderPass2(FILE ** fp);
+
+void printLoadMap(void);
+
+long toHex(char* str, int len);

@@ -16,7 +16,7 @@
 #define ASMLINE_LEN 100 //length of each line in .asm file
 #define TEXTREC_LEN 30 //length of each text record line
 #define MODIFY_LEN 10000//length of modify part in .obj file
-#define BPLIST_LEN 50 //breakpoint list length
+#define BPLIST_LEN 100 //breakpoint list length
 
 unsigned char Mem[MEMORY_SIZE];//one char = one byte
 

@@ -85,8 +85,10 @@ int getFormat(int* mnem, unsigned char* mem) {
 		case DIVR:
 		case MULR:
 		case RMO:
-		case SHIFTL:		case SHIFTR:
-		case SUBR:		case SVC:
+		case SHIFTL:
+		case SHIFTR:
+		case SUBR:
+		case SVC:
 		case(TIXR):
 			return 2;//format 2
 		case ADD:
@@ -103,9 +105,34 @@ int getFormat(int* mnem, unsigned char* mem) {
 		case(JSUB):
 		case(LDA):
 		case(LDB):
-		case(LDCH):		case LDF:		case LDL:		case LDS:		case(LDT):		case LDX:		case LPS:		case MUL:		case MULF:		case OR:		case(RD):
-		case(RSUB):		case SSK:		case(STA):		case(STB):		case(STCH):		case STF:		case STI:		case(STL):		case STS:		case STSW:		case STT:		case(STX):		case SUB:
-		case SUBF:		case(TD):		case TIX:		case(WD):
+		case(LDCH):
+		case LDF:
+		case LDL:
+		case LDS:
+		case(LDT):
+		case LDX:
+		case LPS:
+		case MUL:
+		case MULF:
+		case OR:
+		case(RD):
+		case(RSUB):
+		case SSK:
+		case(STA):
+		case(STB):
+		case(STCH):
+		case STF:
+		case STI:
+		case(STL):
+		case STS:
+		case STSW:
+		case STT:
+		case(STX):
+		case SUB:
+		case SUBF:
+		case(TD):
+		case TIX:
+		case(WD):
 			if ((mem[1] & 0X10) == 0X10)//check e bit from xbpe
 				return 4;
 			else
@@ -201,7 +228,7 @@ int exeInstruct(int mnem, Operand* op) {
 	if (addr) {
 		m3 = 0;
 		//calculate target value(3byte)
-		for (i = 0;; i++) {
+		for (i = 0; addr + i < MEMORY_SIZE; i++) {
 			m3 += Mem[addr + i];
 			if (i == 2)
 				break;
@@ -209,7 +236,7 @@ int exeInstruct(int mnem, Operand* op) {
 		}
 		m6 = m3 << 8;
 		//calculate floating point value
-		for (i = 3;; i++) {
+		for (i = 3; addr + i < MEMORY_SIZE; i++) {
 			m6 += Mem[addr + i];
 			if (i == 5)
 				break;
