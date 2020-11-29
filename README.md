@@ -1,5 +1,5 @@
 # CSE4100 System Programming Project #
-  - Implementing Shell, Assembler, Linking Loader for SIC/XE Machine
+  - Implemented Shell, Assembler, Linking Loader for SIC/XE Machine
 
 ## Execution
 
